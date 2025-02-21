@@ -282,13 +282,25 @@ class ScreenMapper(QMainWindow):
             self.display_screenshot()
             
     def execute_command(self):
-        coord = self.command_input.text().strip().lower()  # Convert to lowercase
+        """Execute click at the specified coordinate"""
+        coord = self.command_input.text().strip().lower()
         point = self.get_grid_center(coord)
         if point:
-            # Move mouse to the absolute screen position
+            # Move mouse to position first
             self.mouse.position = (point.x(), point.y())
-            # Perform click
+            
+            # Wait briefly to ensure proper window focus
+            time.sleep(0.1)
+            
+            # Click to focus window/element
             self.mouse.click(Button.left)
+            
+            # Wait half a second before actual action click
+            time.sleep(0.5)
+            
+            # Perform action click
+            self.mouse.click(Button.left)
+            
             self.command_input.clear()
         else:
             # Show error message for invalid coordinate

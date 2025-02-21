@@ -4,14 +4,102 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from google import genai
 from google.genai import types
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QBuffer, QIODevice
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                            QLineEdit, QPushButton, QLabel, QTextEdit)
+from PySide6.QtCore import Qt, QBuffer, QIODevice, QSize
 from screen_mapper import ScreenMapper
 import json
 import time
 from dotenv import load_dotenv
 from pathlib import Path
 import datetime
+import sys
+
+class AIControlWindow(QMainWindow):
+    def __init__(self, controller):
+        super().__init__()
+        self.controller = controller
+        self.initUI()
+        
+    def initUI(self):
+        # Set window properties
+        self.setWindowTitle('AI Screen Control')
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setFixedSize(300, 200)
+        
+        # Create central widget and layout
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout(central)
+        
+        # Add instruction label
+        instruction = QLabel("Enter what you want the AI to do:")
+        layout.addWidget(instruction)
+        
+        # Add input field
+        self.input_field = QLineEdit()
+        self.input_field.returnPressed.connect(self.execute_action)
+        layout.addWidget(self.input_field)
+        
+        # Add execute button
+        execute_btn = QPushButton("Execute")
+        execute_btn.clicked.connect(self.execute_action)
+        layout.addWidget(execute_btn)
+        
+        # Add status display
+        self.status_display = QTextEdit()
+        self.status_display.setReadOnly(True)
+        self.status_display.setFixedHeight(100)
+        layout.addWidget(self.status_display)
+        
+        # Style the window
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #2b2b2b;
+            }
+            QWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+            }
+            QLineEdit {
+                padding: 5px;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                background-color: #363636;
+            }
+            QPushButton {
+                padding: 8px;
+                background-color: #0066cc;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #0077ee;
+            }
+            QTextEdit {
+                border: 1px solid #555555;
+                border-radius: 3px;
+                background-color: #363636;
+            }
+        """)
+        
+    def execute_action(self):
+        request = self.input_field.text().strip()
+        if not request:
+            return
+            
+        self.status_display.append(f"\nRequest: {request}")
+        try:
+            coordinate = self.controller.execute_action(request)
+            self.status_display.append(f"✓ Clicked at: {coordinate}")
+        except Exception as e:
+            self.status_display.append(f"✗ Error: {str(e)}")
+            
+        self.input_field.clear()
+        
+        # Scroll to bottom
+        scrollbar = self.status_display.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
 class AIController:
     def __init__(self):
@@ -34,6 +122,10 @@ class AIController:
         # Create screenshots directory if it doesn't exist
         self.screenshots_dir = Path(__file__).parent.parent / 'screenshots'
         self.screenshots_dir.mkdir(exist_ok=True)
+        
+        # Create and show control window
+        self.window = AIControlWindow(self)
+        self.window.show()
         
         # Hide the main window - we'll just use it for screenshots
         self.screen_mapper.hide()
@@ -95,10 +187,6 @@ class AIController:
         # Save annotated version
         annotated_path = self.screenshots_dir / f"screenshot_{timestamp}_annotated.png"
         annotated.save(annotated_path)
-        
-        print(f"\nSaved screenshots to:")
-        print(f"Original: {original_path}")
-        print(f"Annotated: {annotated_path}")
 
     def execute_action(self, user_request):
         """Process user request and execute action"""
@@ -147,17 +235,8 @@ def main():
         # Create controller
         controller = AIController()
         
-        while True:
-            try:
-                request = input("\nWhat would you like the AI to do? (or 'quit' to exit): ")
-                if request.lower() == 'quit':
-                    break
-                    
-                coordinate = controller.execute_action(request)
-                print(f"Clicked at coordinate: {coordinate}")
-                
-            except Exception as e:
-                print(f"Error: {e}")
+        # Start Qt event loop
+        sys.exit(controller.app.exec())
                 
     except Exception as e:
         print(f"Initialization error: {e}")
